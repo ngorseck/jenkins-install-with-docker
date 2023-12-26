@@ -1,0 +1,53 @@
+version: '3.1'
+
+services:
+
+  jenkins-docker-in-docker:
+    image: docker:dind
+    container_name: inner-docker
+    privileged: true
+    command: --storage-driver=overlay2
+    restart: always
+    ports:
+      - 2376:2376
+    environment:
+      DOCKER_TLS_CERTDIR: /certs
+    volumes:
+      - jenkins-docker-certs:/certs/client
+      - jenkins-data:/var/jenkins_home
+    networks:
+      jenkins:
+        aliases:
+          - docker
+          #Makes the Docker in Docker container available as the hostname docker within the jenkins network
+
+  jenkins:
+    image: jenkins-devops:2.426.2-1
+    container_name: jenkins-container
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - 8080:8080
+      - 50000:50000
+    environment:
+      #Makes the Docker in Docker container available as the hostname docker within the jenkins network
+      DOCKER_HOST: tcp://docker:2376
+      DOCKER_CERT_PATH: /certs/client
+      DOCKER_TLS_VERIFY: 1
+    depends_on:
+      - jenkins-docker-in-docker
+    volumes:
+      - jenkins-data:/var/jenkins_home
+      - jenkins-docker-certs:/certs/client:ro
+    networks:
+      - jenkins
+
+volumes:
+  jenkins-data:
+  jenkins-docker-certs:
+
+networks:
+  jenkins:
+#https://www.jenkins.io/doc/book/installing/docker/
